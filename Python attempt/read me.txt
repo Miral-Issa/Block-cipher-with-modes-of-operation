@@ -1,0 +1,10 @@
+steps to run the code:
+1) run the script as a python file (the code is written in python)
+2) when asked "Do you want to encrypt a text (T) or an image (I)?"
+   answer with "I" (capital) to encrypt the image
+3) when asked "What encryption to use? ECB_TEA (E) or CBC_TEA (C)?"
+   make sure to enter the correct letter in capital
+4) if you choose E (ECB_TEA) the encryption and decryption images will be saved in the same directory
+   in files named: ecb_encrypted_image.png, and ecb_decrypted_image.png
+5) if you choose C (CBC_TEA) the encryption and decryption images will be saved in the same directory
+   in files named: cbc_encrypted_image.png, and cbc_decrypted_image.png/cbc_decrypted_image2.png

@@ -1,0 +1,158 @@
+#'Aqsa.jpg'
+# Import the necessary libraries
+from PIL import Image
+import numpy as np
+import array as arr
+import codecs
+import random
+
+def ECB_TEA (L0, R0, k):
+    key = [0x11112222, 0x33334444, 0xAAAABBBB, 0xCCCCDDDD]
+    #key = k
+    delta = 0x9E3779B9
+    sum = 0
+    for x in range(32):
+        sum = sum + delta
+        L = L0 + ( ((R0<<4) + key[0]) ^ (R0 + sum) ^ ((R0>>5) + key[1]))
+        R = R0 + ( ((L0<<4) + key[2]) ^ (L0 + sum) ^ ((L0>>5) + key[3]))
+    
+    L= L & 0xFFFFFFFF
+    R= R & 0xFFFFFFFF
+    return [L,R]
+
+def ECB_TEA_DEC(L0,R0,k):
+    key = [0x11112222, 0x33334444, 0xAAAABBBB, 0xCCCCDDDD]
+    #key = k
+    delta = 0x9E3779B9
+    sum = delta<<5
+    for x in range(32):
+        R = R0 - ( ((L0<<4) + key[2]) ^ (L0 + sum) ^ ((L0>>5) + key[3]))
+        L = L0 - ( ((R0<<4) + key[0]) ^ (R0 + sum) ^ ((R0>>5) + key[1]))
+        sum = sum - delta
+    
+    L= L & 0xFFFFFFFF
+    R= R & 0xFFFFFFFF
+    return [L,R]
+
+def CBC_TEA(L0,R0,k,C0,C1):
+    L0 = C0 ^ L0
+    R0 = C1 ^ R0
+
+    enc=ECB_TEA(L0,R0,k)
+    return enc
+
+def CBC_TEA_DEC(L0,R0,k,P0,P1):
+    dec_words = ECB_TEA_DEC(L0,R0,k)
+
+    P0= P0 ^ dec_words[0]
+    P1= P1 ^ dec_words[1]
+
+    return[P0, P1]
+
+
+#ask the user if they want to encrypt a text or an image
+data_array = []
+userChoice = input("do you want to encrypt a text(T) or an image(I)?")
+if(userChoice== "I"):
+    # Load the image
+    image_path = 'Aqsa.jpg'
+    image = Image.open(image_path)
+
+    print(type(image))
+    # Convert the image to RGBA mode
+    #image = image.convert('RGBA')
+
+    # Convert the image to bytes
+    image_bytes = np.array(image)
+    print(type(image))
+
+    # Convert the bytes to a numpy array of 32-bit integers
+    image_array = np.frombuffer(image_bytes, dtype=np.uint32)
+    data_array = image_array
+elif(userChoice == "T"):
+    user_text = input("enter a text to encrypt: ")
+    print("your input: ",user_text)
+    # Convert user text to bytes and then to a numpy array of bytes
+    bytes_array = np.frombuffer(user_text.encode(), dtype=np.uint8)
+
+    # Pad the byte array to make its length a multiple of 4
+    padding_length = (4 - len(bytes_array) % 4) % 4
+    padded_bytes_array = np.pad(bytes_array, (0, padding_length), mode='constant')
+
+    # Convert padded numpy byte array to an array of uint32
+    data_array = np.frombuffer(padded_bytes_array, dtype=np.uint32)
+    print("original bytes= ",data_array)
+
+#enter the key
+key = [1,2,3,4]
+#for i in [0,1,2,3]:
+ #   print("enter the ", i, " long (32bit) of the key in hexadecimal form (0xnum)")
+  #  key[i] = int(input(), 16)
+
+#encrypt the data
+enc_choice = input("What encryption to use? CBC_TEA(C) or EBC_TEA(E)?")
+IV= []
+if(enc_choice == "E"):
+    for x in range(20,len(data_array)-1,2):
+        new_Longs = ECB_TEA(data_array[x], data_array[x+1],key)
+        data_array[x] = new_Longs[0]
+        data_array[x+1] = new_Longs[1]
+elif(enc_choice == "C"):
+    IV = [random.choice(range(0,10000000)),random.choice(range(0,10000000))]
+    IV = np.array(IV, dtype=np.uint32)
+    first_words = CBC_TEA(data_array[0],data_array[1],key,IV[0],IV[1])
+    data_array[0] = first_words[0]
+    data_array[1] = first_words[1]
+    
+    for x in range(2,len(data_array)-1,2):
+        new_Longs = CBC_TEA(data_array[x], data_array[x+1],key,first_words[0],first_words[1])
+        first_words = new_Longs
+        data_array[x] = new_Longs[0]
+        data_array[x+1] = new_Longs[1]
+
+if(userChoice == "I"):
+    # Convert the numpy array back to bytes
+    manipulated_bytes = data_array.tobytes()
+
+    # Create an image from the manipulated bytes
+    manipulated_image = Image.frombytes(image.mode, image.size, manipulated_bytes)
+    #manipulated_image = manipulated_image.convert('RGBA')
+
+    # Save the manipulated image to verify the changes
+    manipulated_image.save('ECB_Encryption.png')
+
+    # Show the manipulated image
+    manipulated_image.show()
+elif (userChoice == "T"):
+    print("encrypted bytes : ", data_array)
+
+#decript
+if(enc_choice == "E"):
+    for x in range(20,len(data_array)-1,2):
+        new_Longs = ECB_TEA_DEC(data_array[x], data_array[x+1], key)
+        data_array[x] = new_Longs[0]
+        data_array[x+1] = new_Longs[1]
+elif(enc_choice == "C"):
+    first_words = CBC_TEA_DEC(data_array[0],data_array[1],key,IV[0],IV[1])
+    data_array[0] = first_words[0]
+    data_array[1] = first_words[1]
+    
+    for x in range(2,len(data_array)-1,2):
+        new_Longs = CBC_TEA_DEC(data_array[x], data_array[x+1],key,first_words[0],first_words[1])
+        first_words = new_Longs
+        data_array[x] = new_Longs[0]
+        data_array[x+1] = new_Longs[1]
+
+if(userChoice == "I"):
+    manipulated_bytes = data_array.tobytes()
+
+    # Create an image from the manipulated bytes
+    manipulated_image = Image.frombytes(image.mode, image.size, manipulated_bytes)
+
+    # Save the manipulated image to verify the changes
+    manipulated_image.save('ECB_Decryption.png')
+
+    # Show the manipulated image
+    manipulated_image.show()
+elif (userChoice == "T"):
+    print("decrypted bytes= ", data_array)
